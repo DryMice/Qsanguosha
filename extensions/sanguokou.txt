@@ -1,0 +1,1124 @@
+module("extensions.sanguokou",package.seeall)
+extension=sgs.Package("sanguokou")
+
+--神郭嘉
+
+sgkgodguojia=sgs.General(extension,"sgkgodguojia","tan", "3")
+sgkgodtianqicard = sgs.CreateSkillCard{
+	name = "sgkgodtianqicard",
+	target_fixed = true,
+	will_throw = false,
+	player = nil,
+	on_use = function(self, room, source)
+		player = source	
+	end,
+	target_fixed = true,
+	feasible = function(self, targets)
+		if (sgs.Sanguosha:getCurrentCardUseReason() == sgs.CardUseStruct_CARD_USE_REASON_RESPONSE)
+				or (sgs.Sanguosha:getCurrentCardUseReason() == sgs.CardUseStruct_CARD_USE_REASON_RESPONSE_USE) then
+			return true
+		end
+		local pattern = ""
+		if sgs.Sanguosha:getCurrentCardUsePattern() == "slash" then
+			pattern = "slash" 
+		elseif string.find(sgs.Sanguosha:getCurrentCardUsePattern(), "peach") then 
+			pattern = "peach"
+		elseif sgs.Sanguosha:getCurrentCardUsePattern() == "jink" then 
+			pattern = "jink"
+		elseif sgs.Sanguosha:getCurrentCardUsePattern() == "nullification" then 
+			pattern = "nullification"
+		end
+		local card = sgs.Sanguosha:cloneCard(pattern, sgs.Card_SuitToBeDecided, 0)
+		card:setSkillName("sgkgodtianqi")
+		local qtargets = sgs.PlayerList()
+		for _, p in ipairs(targets) do
+			qtargets:append(p)
+		end
+		return card and card:targetsFeasible(qtargets, sgs.Self)
+	end,
+	
+	on_validate = function(self, card_use)
+		local source = card_use.from
+		local room = source:getRoom()		
+				
+		room:broadcastSkillInvoke("sgkgodtianqi")	
+		
+		if sgs.Sanguosha:getCurrentCardUseReason() == sgs.CardUseStruct_CARD_USE_REASON_PLAY then			
+			room:notifySkillInvoked(source, "sgkgodtianqi")
+			local ids = room:getNCards(1, false)
+			local id = ids:at(0)
+			local card = sgs.Sanguosha:getCard(id)
+			room:showCard(source, card:getEffectiveId())
+			local choicelist = {"srcantiesuo", "srcanwanjian", "srcannanman", "srcantaoyuan", "srcanwugu","srcanhuogong", "srcanjiedao", "srcanguohe", "srcanshunshou", "srcanwuzhong", "srcanjuedou"}
+			local choices = "cancel"
+			if source:isWounded() then
+				table.insert(choicelist, "srcanpeach")
+			end
+			if not source:hasUsed("Analeptic") then
+				table.insert(choicelist, "srcananaleptic")
+			end
+			if sgs.Slash_IsAvailable(source) then
+				table.insert(choicelist, "srcanslash")
+			end
+			for _,cando in pairs(choicelist) do
+				choices = string.format("%s+%s", cando, choices)
+			end
+			local choice = room:askForChoice(source, "sgkgodtianqibasic", choices)
+			local players = sgs.SPlayerList()
+			if choice == "srcantiesuo" or choice == "srcanwanjian" or choice == "srcannanman" or choice == "srcantaoyuan" or choice == "srcanwugu" or choice ==  "srcanhuogong" or choice == "srcanjiedao" or choice == "srcanguohe" or choice == "srcanshunshou" or choice == "srcanwuzhong" or choice == "srcanjuedou" then
+				if not card:isKindOf("TrickCard") then
+					room:loseHp(source)
+				end
+			end
+			if choice == "srcanpeach" or choice == "srcananaleptic" or choice == "srcanslash" then
+				if not card:isKindOf("BasicCard") then
+					room:loseHp(source)
+				end
+			end
+			if choice == "srcanslash" then
+				local players = sgs.SPlayerList()
+				local slash = sgs.Sanguosha:cloneCard("Slash", card:getSuit(), card:getNumber())
+				for _,p in sgs.qlist(room:getOtherPlayers(source)) do
+					if source:canSlash(p, slash, true) then
+						players:append(p)
+					end
+				end
+				if not players:isEmpty() then
+					local target = room:askForPlayerChosen(source, players, "sgkgodtianqislash", nil, true, false)
+					if target then
+						slash:setSkillName("sgkgodtianqicard")
+						slash:addSubcard(id)
+						local use = sgs.CardUseStruct()
+						use.card = slash
+						use.from = source
+						use.to:append(target)
+						room:useCard(use)
+					end
+				end
+			elseif choice == "srcananaleptic" then
+				local analeptic = sgs.Sanguosha:cloneCard("Analeptic", card:getSuit(), card:getNumber())
+				analeptic:setSkillName("sgkgodtianqicard")
+				analeptic:addSubcard(id)
+				local use = sgs.CardUseStruct()
+				use.card = analeptic
+				use.from = source
+				use.to:append(source)
+				room:useCard(use)
+			elseif choice == "srcanpeach" then
+				local peach = sgs.Sanguosha:cloneCard("Peach", card:getSuit(), card:getNumber())
+				peach:setSkillName("sgkgodtianqicard")
+				peach:addSubcard(id)
+				local use = sgs.CardUseStruct()
+				use.card = peach
+				use.from = source
+				use.to:append(source)
+				room:useCard(use)				
+			elseif choice == "srcantiesuo" then
+				local chain = sgs.Sanguosha:cloneCard("iron_chain", card:getSuit(), card:getNumber())
+				for _,p in sgs.qlist(room:getAlivePlayers()) do
+					if not source:isProhibited(p, chain) then
+						players:append(p)
+					end
+				end
+				if not players:isEmpty() then
+					local target1 = room:askForPlayerChosen(source, players, "sgkgodtianqitiesuo", 
+						nil, true, false)
+					if target1 then
+						players:removeOne(target1)
+						local target2
+						if not players:isEmpty() then
+							target2 = room:askForPlayerChosen(source, players, "sgkgodtianqitiesuo", 
+								nil, true, false)
+						end
+						chain:setSkillName("sgkgodtianqicard")
+						chain:addSubcard(id)
+						local use = sgs.CardUseStruct()
+						use.card = chain
+						use.from = source
+						use.to:append(target1)
+						if target2 then
+							use.to:append(target2)
+						end
+						room:useCard(use)
+					end
+				end
+			elseif choice == "srcanwanjian" then
+				local archery_attack = sgs.Sanguosha:cloneCard("archery_attack", card:getSuit(), card:getNumber())
+				for _,p in sgs.qlist(room:getOtherPlayers(source)) do
+					if not source:isProhibited(p, archery_attack) then
+						players:append(p)
+					end
+				end
+				if not players:isEmpty() then
+					archery_attack:setSkillName("sgkgodtianqicard")
+					archery_attack:addSubcard(id)
+					local use = sgs.CardUseStruct()
+					use.card = archery_attack
+					use.from = source
+					for _,p in sgs.qlist(players) do
+						use.to:append(p)
+					end
+					room:useCard(use)				
+				end
+			elseif choice == "srcannanman" then
+				local savage_assault = sgs.Sanguosha:cloneCard("savage_assault", card:getSuit(), card:getNumber())
+				for _,p in sgs.qlist(room:getOtherPlayers(source)) do
+					if not source:isProhibited(p, savage_assault) then
+						players:append(p)
+					end
+				end
+				if not players:isEmpty() then
+					savage_assault:setSkillName("sgkgodtianqicard")
+					savage_assault:addSubcard(id)
+					local use = sgs.CardUseStruct()
+					use.card = savage_assault
+					use.from = source
+					for _,p in sgs.qlist(players) do
+						use.to:append(p)
+					end
+					room:useCard(use)				
+				end
+			elseif choice == "srcantaoyuan" then
+				local god_salvation = sgs.Sanguosha:cloneCard("god_salvation", card:getSuit(), card:getNumber())
+				for _,p in sgs.qlist(room:getAlivePlayers()) do
+					if not source:isProhibited(p, god_salvation) then
+						players:append(p)
+					end
+				end
+				if not players:isEmpty() then
+					god_salvation:setSkillName("sgkgodtianqicard")
+					god_salvation:addSubcard(id)
+					local use = sgs.CardUseStruct()
+					use.card = god_salvation
+					use.from = source
+					for _,p in sgs.qlist(players) do
+						use.to:append(p)
+					end
+					room:useCard(use)				
+				end			
+			elseif choice == "srcanwugu" then
+				local amazing_grace = sgs.Sanguosha:cloneCard("amazing_grace", card:getSuit(), card:getNumber())
+				for _,p in sgs.qlist(room:getAlivePlayers()) do
+					if not source:isProhibited(p, amazing_grace) then
+						players:append(p)
+					end
+				end
+				if not players:isEmpty() then
+					amazing_grace:setSkillName("sgkgodtianqicard")
+					amazing_grace:addSubcard(id)
+					local use = sgs.CardUseStruct()
+					use.card = amazing_grace
+					use.from = source
+					for _,p in sgs.qlist(players) do
+						use.to:append(p)
+					end
+					room:useCard(use)				
+				end				
+			elseif choice == "srcanhuogong" then
+				local fire_attack = sgs.Sanguosha:cloneCard("fire_attack", card:getSuit(), card:getNumber())
+				for _,p in sgs.qlist(room:getAlivePlayers()) do
+					if not source:isProhibited(p, fire_attack) then
+						if not p:isKongcheng() then
+							players:append(p)
+						end
+					end
+				end
+				if not players:isEmpty() then
+					local target = room:askForPlayerChosen(source, players, "sgkgodtianqihuogong", nil, true, false)
+					if target then
+						fire_attack:setSkillName("sgkgodtianqicard")
+						fire_attack:addSubcard(id)
+						local use = sgs.CardUseStruct()
+						use.card = fire_attack
+						use.from = source
+						use.to:append(target)
+						room:useCard(use)
+					end
+				end				
+			elseif choice == "srcanjiedao" then
+				local collateral = sgs.Sanguosha:cloneCard("collateral", card:getSuit(), card:getNumber())
+				for _,p in sgs.qlist(room:getOtherPlayers(source)) do
+					if not source:isProhibited(p, collateral) then
+						if p:getWeapon() ~= nil then
+							players:append(p)
+						end
+					end
+				end
+				if not players:isEmpty() then
+					local target1 = room:askForPlayerChosen(source, players, "sgkgodtianqijiedao", nil, true, false)
+					if target1 then
+						local otherplayers = sgs.SPlayerList()
+						for _,p in sgs.qlist(room:getOtherPlayers(target1)) do
+							if target1:canSlash(p) then
+								otherplayers:append(p)
+							end
+						end
+						if not otherplayers:isEmpty() then
+							local target2 = room:askForPlayerChosen(source, otherplayers, 
+								"sgkgodtianqijiedao1", nil, true, false)
+							if target2 then
+								collateral:setSkillName("sgkgodtianqicard")
+								collateral:addSubcard(id)
+								local use = sgs.CardUseStruct()
+								use.card = collateral
+								use.from = source
+								use.to:append(target1)
+								use.to:append(target2)
+								room:useCard(use)
+							end
+						end
+					end
+				end				
+			elseif choice == "srcanguohe" then
+				local dismantlement = sgs.Sanguosha:cloneCard("dismantlement", card:getSuit(), card:getNumber())
+				for _,p in sgs.qlist(room:getOtherPlayers(source)) do
+					if not source:isProhibited(p, dismantlement) then
+						if not p:isAllNude() then
+							players:append(p)
+						end
+					end
+				end
+				if not players:isEmpty() then
+					local target = room:askForPlayerChosen(source, players, "sgkgodtianqiguohe", nil, true, false)
+					if target then
+						dismantlement:setSkillName("sgkgodtianqicard")
+						dismantlement:addSubcard(id)
+						local use = sgs.CardUseStruct()
+						use.card = dismantlement
+						use.from = source
+						use.to:append(target)
+						room:useCard(use)
+					end
+				end			
+			elseif choice == "srcanshunshou" then
+				local snatch = sgs.Sanguosha:cloneCard("snatch", card:getSuit(), card:getNumber())
+				for _,p in sgs.qlist(room:getOtherPlayers(source)) do
+					if not source:isProhibited(p, snatch) then
+						if source:distanceTo(p) == 1 then
+							if not p:isAllNude() then
+								players:append(p)
+							end
+						end
+					end
+				end
+				if not players:isEmpty() then
+					local target = room:askForPlayerChosen(source, players, "sgkgodtianqishunshou", 
+						nil, true, false)
+					if target then
+						snatch:setSkillName("sgkgodtianqicard")
+						snatch:addSubcard(id)
+						local use = sgs.CardUseStruct()
+						use.card = snatch
+						use.from = source
+						use.to:append(target)
+						room:useCard(use)
+					end
+				end					
+			elseif choice == "srcanwuzhong" then
+				local ex_nihilo = sgs.Sanguosha:cloneCard("ex_nihilo", card:getSuit(), card:getNumber())
+				ex_nihilo:setSkillName("sgkgodtianqicard")
+				ex_nihilo:addSubcard(id)
+				local use = sgs.CardUseStruct()
+				use.card = ex_nihilo
+				use.from = source
+				use.to:append(source)
+				room:useCard(use)			
+			elseif choice == "srcanjuedou" then
+				local duel = sgs.Sanguosha:cloneCard("duel", card:getSuit(), card:getNumber())
+				for _,p in sgs.qlist(room:getOtherPlayers(source)) do
+					if not source:isProhibited(p, duel) then
+						players:append(p)
+					end
+				end
+				if not players:isEmpty() then
+					local target = room:askForPlayerChosen(source, players, "sgkgodtianqijuedou", nil, true, false)
+					if target then
+						duel:setSkillName("sgkgodtianqicard")
+						duel:addSubcard(id)
+						local use = sgs.CardUseStruct()
+						use.card = duel
+						use.from = source
+						use.to:append(target)
+						room:useCard(use)
+					end
+				end
+			end
+			room:setPlayerFlag(source, "losetianqi")			
+	
+		elseif sgs.Sanguosha:getCurrentCardUsePattern() == "slash" then	
+			local ids = room:getNCards(1, false)
+			local id = ids:at(0)
+			local card = sgs.Sanguosha:getCard(id)
+			local move = sgs.CardsMoveStruct()
+			move.card_ids = ids
+			move.to = source
+			move.to_place = sgs.Player_PlaceTable
+			move.reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_TURNOVER, source:objectName(), self:objectName(), nil)
+			room:moveCardsAtomic(move, true)		
+			local use_card = sgs.Sanguosha:cloneCard("slash", card:getSuit(), card:getNumber())
+			use_card:setSkillName("sgkgodtianqi")			
+			use_card:deleteLater()			
+			local tos = card_use.to
+			for _, to in sgs.qlist(tos) do
+				local skill = room:isProhibited(card_use.from, to, use_card)
+				if skill then
+					local log = sgs.LogMessage()
+					log.type = "#SkillAvoid"
+					log.from = to
+					log.arg = skill:objectName()
+					log.arg2 = use_card:objectName()
+					room:sendLog(log)					
+					room:broadcastSkillInvoke(skill:objectName())
+					card_use.to:removeOne(to)
+				end
+			end
+			if not card:isKindOf("BasicCard") then
+				room:loseHp(source)
+			end
+			return use_card
+		elseif string.find(sgs.Sanguosha:getCurrentCardUsePattern(), "peach") or sgs.Sanguosha:getCurrentCardUsePattern() == "peach" then
+			local ids = room:getNCards(1, false)
+			local id = ids:at(0)
+			local card = sgs.Sanguosha:getCard(id)
+			local move = sgs.CardsMoveStruct()
+			move.card_ids = ids
+			move.to = source
+			move.to_place = sgs.Player_PlaceTable
+			move.reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_TURNOVER, source:objectName(), self:objectName(), nil)
+			room:moveCardsAtomic(move, true)	
+			local use_card = sgs.Sanguosha:cloneCard("peach", card:getSuit(), card:getNumber())
+			use_card:setSkillName("sgkgodtianqi")			
+			use_card:deleteLater()			
+			local tos = card_use.to
+			for _, to in sgs.qlist(tos) do
+				local skill = room:isProhibited(card_use.from, to, use_card)
+				if skill then
+					local log = sgs.LogMessage()
+					log.type = "#SkillAvoid"
+					log.from = to
+					log.arg = skill:objectName()
+					log.arg2 = use_card:objectName()
+					room:sendLog(log)					
+					room:broadcastSkillInvoke(skill:objectName())
+					card_use.to:removeOne(to)
+				end
+			end
+			if not card:isKindOf("BasicCard") then
+				room:loseHp(source)
+			end
+			return use_card
+			
+		elseif sgs.Sanguosha:getCurrentCardUsePattern() == "jink" then
+			local ids = room:getNCards(1, false)
+			local id = ids:at(0)
+			local card = sgs.Sanguosha:getCard(id)
+			local move = sgs.CardsMoveStruct()
+			move.card_ids = ids
+			move.to = source
+			move.to_place = sgs.Player_PlaceTable
+			move.reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_TURNOVER, source:objectName(), self:objectName(), nil)
+			room:moveCardsAtomic(move, true)
+			room:throwCard(card, nil, nil)
+		
+			local use_card = sgs.Sanguosha:cloneCard("jink", card:getSuit(), card:getNumber())
+			use_card:setSkillName("sgkgodtianqi")			
+			use_card:deleteLater()			
+			local tos = card_use.to
+			for _, to in sgs.qlist(tos) do
+				local skill = room:isProhibited(card_use.from, to, use_card)
+				if skill then
+					local log = sgs.LogMessage()
+					log.type = "#SkillAvoid"
+					log.from = to
+					log.arg = skill:objectName()
+					log.arg2 = use_card:objectName()
+					room:sendLog(log)					
+					room:broadcastSkillInvoke(skill:objectName())
+					card_use.to:removeOne(to)
+				end
+			end
+			if not card:isKindOf("BasicCard") then
+				room:loseHp(source)
+			end
+			return use_card
+				
+		elseif sgs.Sanguosha:getCurrentCardUsePattern() == "nullification" then
+			local ids = room:getNCards(1, false)
+			local id = ids:at(0)
+			local card = sgs.Sanguosha:getCard(id)
+			local move = sgs.CardsMoveStruct()
+			move.card_ids = ids
+			move.to = source
+			move.to_place = sgs.Player_PlaceTable
+			move.reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_TURNOVER, source:objectName(), self:objectName(), nil)
+			room:moveCardsAtomic(move, true)			
+			local use_card = sgs.Sanguosha:cloneCard("nullification", card:getSuit(), card:getNumber())
+			use_card:setSkillName("sgkgodtianqi")			
+			use_card:deleteLater()			
+			if not card:isKindOf("TrickCard") then
+				room:loseHp(source)
+			end
+			return use_card	
+									
+		end		
+	end,
+	on_validate_in_response = function(self, zhenji)
+		local room = zhenji:getRoom()
+		room:broadcastSkillInvoke("sgkgodtianqi")			
+		
+		if sgs.Sanguosha:getCurrentCardUsePattern() == "slash"  then
+			room:notifySkillInvoked(zhenji, "sgkgodtianqi")
+			local ids = room:getNCards(1, false)
+			local id = ids:at(0)
+			local card = sgs.Sanguosha:getCard(id)
+			local move = sgs.CardsMoveStruct()
+			move.card_ids = ids
+			move.to = zhenji
+			move.to_place = sgs.Player_PlaceTable
+			move.reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_TURNOVER, zhenji:objectName(), self:objectName(), nil)
+			room:moveCardsAtomic(move, true)
+			local use_card = sgs.Sanguosha:cloneCard("slash", card:getSuit(), card:getNumber())
+			use_card:setSkillName("sgkgodtianqi")			
+			use_card:deleteLater()
+			
+			if not card:isKindOf("BasicCard") then
+				room:loseHp(zhenji)
+			end
+			return use_card								
+		elseif sgs.Sanguosha:getCurrentCardUsePattern() == "peach" or string.find(sgs.Sanguosha:getCurrentCardUsePattern(), "peach") then
+			room:notifySkillInvoked(zhenji, "sgkgodtianqi")
+			local ids = room:getNCards(1, false)
+			local id = ids:at(0)
+			local card = sgs.Sanguosha:getCard(id)
+			local move = sgs.CardsMoveStruct()
+			move.card_ids = ids
+			move.to = zhenji
+			move.to_place = sgs.Player_PlaceTable
+			move.reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_TURNOVER, zhenji:objectName(), self:objectName(), nil)
+			room:moveCardsAtomic(move, true)
+			local use_card = sgs.Sanguosha:cloneCard("peach", card:getSuit(), card:getNumber())
+			use_card:setSkillName("sgkgodtianqi")			
+			use_card:deleteLater()
+			
+			if not card:isKindOf("BasicCard") then
+				room:loseHp(zhenji)
+			end
+			return use_card	
+		elseif sgs.Sanguosha:getCurrentCardUsePattern() == "jink" then
+			room:notifySkillInvoked(zhenji, "sgkgodtianqi")
+			local ids = room:getNCards(1, false)
+			local id = ids:at(0)
+			local card = sgs.Sanguosha:getCard(id)
+			local move = sgs.CardsMoveStruct()
+			move.card_ids = ids
+			move.to = zhenji
+			move.to_place = sgs.Player_PlaceTable
+			move.reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_TURNOVER, zhenji:objectName(), self:objectName(), nil)
+			room:moveCardsAtomic(move, true)
+			local use_card = sgs.Sanguosha:cloneCard("jink", card:getSuit(), card:getNumber())
+			use_card:setSkillName("sgkgodtianqi")			
+			use_card:deleteLater()
+			
+			if not card:isKindOf("BasicCard") then
+				room:loseHp(zhenji)
+			end
+			return use_card			
+		else
+			room:notifySkillInvoked(zhenji, "sgkgodtianqi")
+			local ids = room:getNCards(1, false)
+			local id = ids:at(0)
+			local card = sgs.Sanguosha:getCard(id)
+			local move = sgs.CardsMoveStruct()
+			move.card_ids = ids
+			move.to = zhenji
+			move.to_place = sgs.Player_PlaceTable
+			move.reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_TURNOVER, zhenji:objectName(), self:objectName(), nil)
+			room:moveCardsAtomic(move, true)
+			local use_card = sgs.Sanguosha:cloneCard("nullification", card:getSuit(), card:getNumber())
+			use_card:setSkillName("sgkgodtianqi")			
+			use_card:deleteLater()
+			if not card:isKindOf("TrickCard") then
+				room:loseHp(zhenji)
+			end
+			return use_card				
+		end		
+	end,	
+}
+
+sgkgodtianqi = sgs.CreateViewAsSkill{
+	name = "sgkgodtianqi",
+	n = 0,
+	response_pattern = "nullification",
+	view_as = function(self, cards)
+		return sgkgodtianqicard:clone()
+	end,
+	enabled_at_play = function(self, player)
+		return not player:hasFlag("losetianqi")
+	end, 
+	enabled_at_response = function(self, player, pattern)
+		return (pattern == "slash" or pattern == "jink" or pattern == "peach" or pattern == "nullification") and player:getHp() > 0
+	end,
+	enabled_at_nullification = function(self, player)
+		return player:getHp() > 0
+	end,
+}
+
+sgkgodtianji=sgs.CreateTriggerSkill{
+name="sgkgodtianji",
+events=sgs.EventPhaseStart,
+on_trigger=function(self,event,player,data)
+	if player:getPhase()~=sgs.Player_Play then return false end
+	local room=player:getRoom()
+	local s=room:findPlayerBySkillName(self:objectName())
+	if not s then return false end
+	if not s:askForSkillInvoke(self:objectName(),data) then return false end
+	room:broadcastSkillInvoke(self:objectName())
+	local ids=sgs.IntList()
+	local drawpile=room:getDrawPile()
+	drawpile=sgs.QList2Table(drawpile)
+	local id=drawpile[1]
+	ids:append(id)
+	room:fillAG(ids,s)
+	room:getThread():delay()
+	local flag=false
+	local x=s:getHandcardNum()
+	local choices={"sgkgodtianjitihuan","sgkgodtianjiget","cancel"}
+	for _,p in sgs.qlist(room:getOtherPlayers(s)) do
+		if p:getHandcardNum()>x then
+			flag=true
+			break
+		end
+	end
+	if s:isKongcheng() then
+		table.removeOne(choices,"sgkgodtianjitihuan")
+	end
+	if flag==false then
+		table.removeOne(choices,"sgkgodtianjiget")
+	end
+	local choice=room:askForChoice(s,self:objectName(),table.concat(choices,"+"))
+	if choice=="sgkgodtianjitihuan" then
+		--local cards=room:askForExchange(s,self:objectName(),1,false,"Sgkgodtianjicard")
+		--card_id=cards:getSubcards():first()
+		--local move=sgs.CardsMoveStruct()
+		--move.card_ids:append(card_id)
+		--move.to_place=sgs.Player_DrawPile
+		--move.reason=sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_PUT,s:objectName(),self:objectName(),"")
+		--room:moveCardsAtomic(move,true)
+		--room:obtainCard(s,id,false)
+		room:obtainCard(s,id,false)
+		local id5 = room:askForCard(s, ".!", "@str_shaimu-give", sgs.QVariant(), sgs.Card_MethodNone)
+		local reason = sgs.CardMoveReason(sgs.CardMoveReason_S_REASON_PUT, s:objectName(), nil, "sgkgodtianji", nil)
+		room:moveCardTo(id5, s, nil, sgs.Player_DrawPile, reason, true)
+	elseif choice=="sgkgodtianjiget" then
+		room:obtainCard(s,id,false)
+	end
+	room:clearAG()
+end,
+can_trigger=function()
+	return true
+end
+}
+
+sgkgodguojia:addSkill(sgkgodtianqi)
+--sgkgodguojia:addSkill(sgkgodtianqiTrigger)
+--sgkgodguojia:addSkill(sgkgodtianqiTrigger2)
+--sgkgodguojia:addSkill(sgkgodtianqiTrigger3)
+sgkgodguojia:addSkill(sgkgodtianji)
+sgs.LoadTranslationTable{
+	["sgkgodtianqiTrigger3"] = "天啟",
+	["sgkgodtianqitrigger3"] = "天啟",
+	["sgkgodtianqiTrigger3Card"] = "天啟",
+	["sgkgodtianqicard"] = "天啟",
+
+}
+
+--神黄月英
+
+sgkgodhuangyueying=sgs.General(extension,"sgkgodhuangyueying","tan","3",false)
+
+sgkgodzhiming=sgs.CreateTriggerSkill{
+name="sgkgodzhiming",
+events=sgs.EventPhaseStart,
+on_trigger=function(self,event,player,data)
+	if player:getPhase()~=sgs.Player_Start then return false end
+	local room=player:getRoom()
+	local s=room:findPlayerBySkillName(self:objectName())
+	if not s then return false end
+	if s:objectName()==player:objectName() then return false end
+	if player:isKongcheng() then return false end
+	if not s:canDiscard(s,"h") then return false end
+	local card=room:askForCard(s,".|.|.|hand","@sgkgodzhiming",data,self:objectName())
+	if not card then return false end
+	room:broadcastSkillInvoke(self:objectName())
+	local id=room:askForCardChosen(s,player,"h",self:objectName())
+	room:throwCard(id,player,s)
+	if card:sameColorWith(sgs.Sanguosha:getCard(id)) then
+		if room:askForChoice(s,self:objectName(),"sgkgodzhimingdraw+sgkgodzhimingplay")=="sgkgodzhimingdraw" then
+			player:skip(sgs.Player_Draw)
+		else
+			player:skip(sgs.Player_Play)
+		end
+	end
+end,
+can_trigger=function()
+	return true
+end
+}
+
+sgkgodsuyin=sgs.CreateTriggerSkill{
+name="sgkgodsuyin",
+events=sgs.CardsMoveOneTime,
+on_trigger=function(self,event,player,data)
+	local move=data:toMoveOneTime()
+	if move.from and move.from:objectName()==player:objectName() then
+		if move.from_places:contains(sgs.Player_PlaceHand) then
+			if move.is_last_handcard then
+				if player:getPhase()==sgs.Player_NotActive then
+					local room=player:getRoom()
+					local s=room:askForPlayerChosen(player,room:getOtherPlayers(player),self:objectName(),"sgkgodsuyin-invoke",true,true)
+					if not s then return false end
+					room:broadcastSkillInvoke(self:objectName())
+					s:turnOver()
+				end
+			end
+		end
+	end
+end
+}
+
+sgkgodhuangyueying:addSkill(sgkgodzhiming)
+sgkgodhuangyueying:addSkill(sgkgodsuyin)
+
+--神张角
+
+sgkgodzhangjiao=sgs.General(extension,"sgkgodzhangjiao","tan","3")
+
+sgkgoddianjie=sgs.CreateTriggerSkill{
+name="sgkgoddianjie",
+events=sgs.EventPhaseChanging,
+on_trigger=function(self,event,player,data)
+	local change=data:toPhaseChange()
+	if change.to~=sgs.Player_Draw and change.to~=sgs.Player_Play then return false end
+	if player:isSkipped(change.to) then return false end
+	if not player:askForSkillInvoke(self:objectName(),data) then return false end
+	local room=player:getRoom()
+	if change.to==sgs.Player_Draw then
+		room:broadcastSkillInvoke(self:objectName(),1)
+	else
+		room:broadcastSkillInvoke(self:objectName(),2)
+	end
+	player:skip(change.to)
+	local judge=sgs.JudgeStruct()
+	judge.who=player
+	judge.pattern=".|black"
+	judge.reason=self:objectName()
+	judge.good=true
+	room:judge(judge)
+	if judge:isGood() then 
+		local s=room:askForPlayerChosen(player,room:getAlivePlayers(),self:objectName(),"sgkgoddianjie-invoke",true,true)
+		if not s then return false end
+		room:damage(sgs.DamageStruct(nil,player,s,1,sgs.DamageStruct_Thunder))
+	else
+		local s1=room:askForPlayerChosen(player,room:getAlivePlayers(),self:objectName(),"sgkgoddianjie-chain",true,true)
+		if not s1 then return false end
+		room:setPlayerProperty(s1, "chained", sgs.QVariant(true))
+		local s2=room:askForPlayerChosen(player,room:getAlivePlayers(),self:objectName(),"sgkgoddianjie-chain",true,true)
+		if not s2 then return false end
+		room:setPlayerProperty(s2, "chained", sgs.QVariant(true))
+	end
+end
+}
+
+skgodshendao=sgs.CreateTriggerSkill{
+name ="skgodshendao",
+events=sgs.AskForRetrial,
+on_trigger=function(self,event,player,data)
+	if not player:askForSkillInvoke(self:objectName(),data) then return false end
+	local room=player:getRoom()
+	room:broadcastSkillInvoke(self:objectName())
+	local _targets = sgs.SPlayerList()
+	for _, p in sgs.qlist(room:getOtherPlayers(player)) do
+		if player:canDiscard(p, "ej") then _targets:append(p) end
+	end
+	_targets:append(player)
+	if not _targets:isEmpty() then
+		local to_discard = room:askForPlayerChosen(player, _targets, "skgodshendao", "@skgodshendao-retrial", true)
+		if to_discard then
+			if to_discard:objectName() ~= to_discard:objectName() then
+				local id = room:askForCardChosen(player, to_discard, "ej", "skgodshendao", false, sgs.Card_MethodDiscard)
+				room:broadcastSkillInvoke(self:objectName())
+				room:retrial(sgs.Sanguosha:getCard(id),player,data:toJudge(),self:objectName(),false)
+			elseif to_discard:objectName() == to_discard:objectName() then
+				local id = room:askForCardChosen(player, to_discard, "hej", "skgodshendao", false, sgs.Card_MethodDiscard)
+				room:broadcastSkillInvoke(self:objectName())
+				room:retrial(sgs.Sanguosha:getCard(id),player,data:toJudge(),self:objectName(),false)
+			end
+		end
+	end
+end
+}
+
+skgodleihun=sgs.CreateTriggerSkill{
+name="skgodleihun",
+frequency=sgs.Skill_Compulsory,
+events=sgs.DamageInflicted,
+on_trigger=function(self,event,player,data)
+	local damage=data:toDamage()
+	if damage.nature~=sgs.DamageStruct_Thunder then return false end
+	local room=player:getRoom()
+	local log=sgs.LogMessage()
+	log.from=player
+	log.arg=self:objectName()
+	log.type="#TriggerSkill"
+	room:sendLog(log)
+	room:notifySkillInvoked(player,self:objectName())
+	room:broadcastSkillInvoke(self:objectName())
+	if player:isWounded() then
+		local recover=sgs.RecoverStruct()
+		recover.recover=math.min(damage.damage,player:getLostHp())
+		room:recover(player,recover)
+	end
+	return true
+end
+}
+
+sgkgodzhangjiao:addSkill(sgkgoddianjie)
+sgkgodzhangjiao:addSkill(skgodshendao)
+sgkgodzhangjiao:addSkill(skgodleihun)
+
+
+--神张辽
+
+sgkgodzhangliao=sgs.General(extension,"sgkgodzhangliao","tan","4")
+
+sgkgodnizhan=sgs.CreateTriggerSkill{
+name="sgkgodnizhan",
+events=sgs.DamageInflicted,
+on_trigger=function(self,event,player,data)
+	local room=player:getRoom()
+	local s=room:findPlayerBySkillName(self:objectName())
+	if not s then return false end
+	local damage=data:toDamage()
+	if not damage.to:isAlive() then return false end
+	if not damage.card then return false end
+	if not damage.card:isKindOf("Slash") and not damage.card:isKindOf("Duel") then return false end
+	if not s:askForSkillInvoke(self:objectName(),data) then return false end
+	room:broadcastSkillInvoke(self:objectName())
+	local choice="sgkgodnizhanto"
+	if damage.from and damage.from:objectName()~=s:objectName() and damage.to:objectName()~=s:objectName() then
+		choice=room:askForChoice(s,self:objectName(),"sgkgodnizhanfrom+sgkgodnizhanto")
+	end
+	if choice=="sgkgodnizhanfrom" or damage.to:objectName()==s:objectName() then
+		damage.from:gainMark("@sgkgodxi")
+	elseif choice=="sgkgodnizhanto" or damage.from:objectName()==s:objectName() then
+		damage.to:gainMark("@sgkgodxi")
+	end
+end,
+can_trigger=function()
+	return true
+end
+}
+
+skgodcuifeng=sgs.CreateTriggerSkill{
+name="skgodcuifeng",
+events=sgs.EventPhaseStart,
+frequency=sgs.Skill_Compulsory,
+on_trigger=function(self,event,player,data)
+	if player:getPhase()~=sgs.Player_Finish then return false end
+	local x=0
+	local room=player:getRoom()
+	for _,p in sgs.qlist(room:getAlivePlayers()) do
+		x=x+p:getMark("@sgkgodxi")
+	end
+	if x<4 then return false end
+	local log=sgs.LogMessage()
+	log.type="#TriggerSkill"
+	log.from=player
+	log.arg=self:objectName()
+	room:sendLog(log)
+	room:notifySkillInvoked(player,self:objectName())
+	room:broadcastSkillInvoke(self:objectName())
+	for _,p in sgs.qlist(room:getOtherPlayers(player)) do
+		if not player:isAlive() then break end
+		if p:getMark("@sgkgodxi")>0 then
+			local hand=p:getHandcardNum()
+			local mark=p:getMark("@sgkgodxi")
+			if hand<mark then
+				room:obtainCard(player,p:wholeHandCards(),false)
+				room:damage(sgs.DamageStruct(nil,player,p))
+			else
+				room:setPlayerFlag(p,"skgodcuifeng_InTempMoving")
+				local dummy=sgs.Sanguosha:cloneCard("slash",sgs.Card_SuitToBeDecided,-1)
+				local card_ids={}
+				local original_places={}
+				local count=0
+				for i=1,mark,1 do
+					if not player:canDiscard(p,"h") then break end
+					local id=room:askForCardChosen(player,p,"h",self:objectName())
+					table.insert(card_ids,id)
+					local place=room:getCardPlace(id)
+					table.insert(original_places,place)
+					dummy:addSubcard(id)
+					p:addToPile("#skgodcuifeng",id,false)
+					count=count+1
+				end
+				for i=1,count,1 do
+					local card=sgs.Sanguosha:getCard(card_ids[i])
+					room:moveCardTo(card,p,original_places[i],false)
+				end
+				room:setPlayerFlag(p,"-skgodcuifeng_InTempMoving")
+				if count>0 then
+					room:obtainCard(player,dummy,false)
+				end
+			end
+		end
+	end
+	for _,p in sgs.qlist(room:getAlivePlayers()) do
+		if p:getMark("@sgkgodxi")>0 then
+			p:loseAllMarks("@sgkgodxi")
+		end
+	end
+end
+}
+
+skgodcuifengfakemove=sgs.CreateTriggerSkill{
+name="#skgodcuifengfakemove",
+events=sgs.CardsMoveOneTime,
+on_trigger=function(self,event,player,data)
+    local room=player:getRoom()
+    for _,p in sgs.qlist(room:getAllPlayers()) do
+        if p:hasFlag("skgodcuifeng_InTempMoving") then return true end
+    end
+end,
+can_trigger=function()
+	return true
+end,
+priority=10
+}
+
+extension:insertRelatedSkills("skgodcuifeng","#skgodcuifengfakemove")
+
+skgodweizhen=sgs.CreateTriggerSkill{
+name="skgodweizhen",
+events=sgs.EventPhaseStart,
+on_trigger=function(self,event,player,data)
+	if player:getPhase()~=sgs.Player_Start then return false end
+	local flag=false
+	local room=player:getRoom()
+	for _,p in sgs.qlist(room:getAlivePlayers()) do
+		if p:getMark("@sgkgodxi")>0 then
+			flag=true
+			break
+		end
+	end
+	if flag==false then return false end
+	if not player:askForSkillInvoke(self:objectName(),data) then return false end
+	room:broadcastSkillInvoke(self:objectName())
+	local x=0
+	for _,p in sgs.qlist(room:getAlivePlayers()) do
+		if p:getMark("@sgkgodxi")>0 then
+			x=x+p:getMark("@sgkgodxi")
+			p:loseAllMarks("@sgkgodxi")
+		end
+	end
+	player:drawCards(x)
+end
+}
+
+sgkgodzhangliao:addSkill(sgkgodnizhan)
+sgkgodzhangliao:addSkill(skgodcuifeng)
+sgkgodzhangliao:addSkill(skgodcuifengfakemove)
+sgkgodzhangliao:addSkill(skgodweizhen)
+
+--神陆逊
+
+skgodluxun=sgs.General(extension,"skgodluxun","tan","4")
+
+skgodjieyan = sgs.CreateTriggerSkill{
+	name = "skgodjieyan" ,
+	frequency = sgs.Skill_NotFrequent,
+	events = {sgs.TargetConfirming},
+	on_trigger = function(self, event, player, data)
+		local room = player:getRoom()
+		if event == sgs.TargetConfirming then
+			local srcaocao = room:findPlayerBySkillName(self:objectName())
+			if not srcaocao or srcaocao:isDead() or not srcaocao:hasSkill(self:objectName()) then return false end
+			local use = data:toCardUse()
+			local source = use.from
+			local targets = use.to
+			if not source then return false end
+			if not targets:contains(player) then return false end
+			local card = use.card
+			if not (card:isKindOf("Slash") or card:isNDTrick()) then return false end
+			if not card:isRed() then return false end
+			local canTrigger = true 
+			for _, p in sgs.qlist(room:getOtherPlayers(player)) do
+				if use.to:contains(p) then canTrigger = false end
+			end
+			if not canTrigger then return false end			
+			local cando = 0
+			if srcaocao:isKongcheng() then return false end
+			if not (srcaocao ~= player) then return false end
+			if not room:askForSkillInvoke(srcaocao, self:objectName(), data) then return false end					
+			room:notifySkillInvoked(srcaocao, "skgodjieyan")
+			room:broadcastSkillInvoke("skgodjieyan")
+			local id = room:askForCard(srcaocao, ".,Equip!", "@skgodjieyan", sgs.QVariant(), sgs.Card_MethodNone)
+			room:throwCard(id, srcaocao, srcaocao)
+			use.to:removeOne(player)
+			room:damage(sgs.DamageStruct(nil,srcaocao,player,1,sgs.DamageStruct_Fire))
+			room:sortByActionOrder(use.to)
+			data:setValue(use)
+			room:getThread():trigger(sgs.TargetConfirming, room, srcaocao, data)
+			return false								
+		end		
+		return false
+	end,
+	can_trigger = function(self, target)
+		return target and target:isAlive()
+	end
+}
+
+
+skgodfenying=sgs.CreateTriggerSkill{
+name="skgodfenying",
+events=sgs.Damage,
+on_trigger=function(self,event,player,data)
+	local damage=data:toDamage()
+	if not damage.to:isAlive() then return false end
+	if player:isNude() then return false end
+	if player:getHandcardNum()>player:getMaxHp() then return false end
+	local distance=1000
+	local room=player:getRoom()
+	for _,p in sgs.qlist(room:getOtherPlayers(damage.to)) do
+		if p:distanceTo(damage.to)<distance then
+			distance=p:distanceTo(damage.to)
+		end
+	end
+	local all=sgs.SPlayerList()
+	for _,p in sgs.qlist(room:getOtherPlayers(damage.to)) do
+		if p:distanceTo(damage.to)==distance then
+			all:append(p)
+		end
+	end
+	all:append(damage.to)
+	if all:isEmpty() then return false end
+	local card=room:askForCard(player,".|red|.|.","@skgodfenying",sgs.QVariant(),sgs.NonTrigger)
+	if not card then return false end
+	local s=room:askForPlayerChosen(player,all,self:objectName(),"sgkgodfenying-invoke",false,true)
+	room:throwCard(card,player,nil)
+	room:broadcastSkillInvoke(self:objectName())
+	local damage2=sgs.DamageStruct()
+	damage2.damage=damage.damage
+	damage2.nature=sgs.DamageStruct_Fire
+	damage2.from=player
+	damage2.to=s
+	room:damage(damage2)
+end
+}
+
+skgodluxun:addSkill(skgodjieyan)
+skgodluxun:addSkill(skgodfenying)
+
+sgs.LoadTranslationTable{
+["sanguokou"]="三國kill神將",
+
+["sgkgodguojia"]="神郭嘉",
+["#sgkgodguojia"]="天人合一",
+["sgkgodtianqi"]="天启",
+[":sgkgodtianqi"]="每当你需要使用或打出一张基本牌或非延时类锦囊牌时，若你不处于濒死状态，你可以声明之，然后亮出牌堆顶的一张牌，然后将此牌当你声明的牌使用或打出，若此牌与你声明的牌类型不同，你须先失去1点体力。（<font color=\"green\"><b>你的出牌阶段限一次</b></font>）",
+["$sgkgodtianqicard"]="%from 亮出了牌堆顶的 %card",
+["sgkgodtianqipeach"]="天启",
+["sgkgodtianqislash"]="天启",
+["sgkgodtianqinullification"]="天启",
+["sgkgodtianqianaleptic"]="天启",
+["sgkgodtianqislashuse"]="天启",
+["sgkgodtianqitrick"]="天启",
+["#sgkgodtianqishengming"]="%from 声明了 【%arg】",
+["sgkgodtianqi-target"]="请选择此牌的目标",
+["sgkgodtianqi-extratarget"]="你可以继续选择一名目标角色",
+["sgkgodtianji"]="天机",
+[":sgkgodtianji"]="每当一名角色的出牌阶段开始时，你可以观看牌堆顶的一张牌，然后你可以选择一项：1.用一张手牌替换之；2.若你的手牌数不是全场最多的(或之一)，你可以获得之。",
+["sgkgodtianjitihuan"]="用一张手牌替换之",
+["sgkgodtianjiget"]="获得之",
+["Sgkgodtianjicard"]="请选择用于交换的手牌",
+["$sgkgodtianqi1"]="荡破天光，领得天启！",
+["$sgkgodtianqi2"]="谋事在人，成事在天。",
+["$sgkgodtianji"]="天机可知却不可说。",
+["~sgkgodguojia"]="窥天意，竭心力，皆为吾主！",
+["designer:sgkgodguojia"]="網路神人",
+["illustrator:sgkgodguojia"]="網路神人",
+["cv:sgkgodguojia"]="網路神人",
+
+["sgkgodhuangyueying"]="神黄月英",
+["#sgkgodhuangyueying"]="夕風霞影",
+["sgkgodzhiming"]="知命",
+[":sgkgodzhiming"]="每当一名其他角色的准备阶段开始时，若其有手牌，你可以弃置一张手牌，然后弃置其一张手牌，若两张牌颜色相同，你令其跳过此回合的摸牌阶段或出牌阶段。",
+["@sgkgodzhiming"]="你可以弃置一张手牌发动“知命”",
+["sgkgodzhimingdraw"]="摸牌阶段",
+["sgkgodzhimingplay"]="出牌阶段",
+["sgkgodsuyin"]="夙隐",
+[":sgkgodsuyin"]="回合外，每当你失去最后的手牌后，你可令一名其他角色将其武将牌翻面。",
+["sgkgodsuyin-invoke"]="你可令一名其他角色将其武将牌翻面",
+["$sgkgodzhiming"]="风起日落,天行有常。",
+["$sgkgodsuyin"]="欲别去归隐,无负奢望。",
+["~sgkgodhuangyueying"]="只盼明日，能共沐晨光……",
+["designer:sgkgodhuangyueying"]="網路神人",
+["illustrator:sgkgodhuangyueying"]="網路神人",
+["cv:sgkgodhuangyueying"]="網路神人",
+
+["sgkgodzhangjiao"]="神张角",
+["#sgkgodzhangjiao"]="雷霆萬鈞",
+["sgkgoddianjie"]="电界",
+[":sgkgoddianjie"]="每当你的摸牌阶段或出牌阶段即将开始时，你可以跳过此阶段，然后你可以令一名角色进行一次判定，若判定结果为黑色，你对其造成1点雷电伤害。",
+["sgkgoddianjie-invoke"]="你可以令一角色进行判定，若判定结果为黑色，你对其造成1点雷电伤害",
+["skgodshendao"]="神道",
+[":skgodshendao"]="每当一名角色的判定牌生效前，你可以亮出牌堆顶的两张牌，选择其中一张牌代替之，然后获得另一张牌。",
+["skgodleihun"]="雷魂",
+[":skgodleihun"]="<font color=\"blue\"><b>锁定技，</b></font>每当你受到雷电伤害时，你防止之，然后回复等同于此次伤害值的体力。",
+["$sgkgoddianjie1"]="电破苍穹，雷震九州！",
+["$sgkgoddianjie2"]="风雷如律令，发咒显圣灵！",
+["$skgodshendao"]="人世之伎俩，与鬼神无用！",
+["$skgodleihun"]="肉体凡胎,也敢扰我清静！",
+["~sgkgodzhangjiao"]="吾之信仰,也将化为微尘……",
+["designer:sgkgodzhangjiao"]="網路神人",
+["illustrator:sgkgodzhangjiao"]="網路神人",
+["cv:sgkgodzhangjiao"]="網路神人",
+
+
+["sgkgodzhangliao"]="神张辽",
+["#sgkgodzhangliao"]="威震逍遙",
+["sgkgodnizhan"]="逆战",
+[":sgkgodnizhan"]="每当一名角色受到【杀】或【决斗】造成的伤害时，你可以令该角色或伤害来源（不得为你）获得一枚“袭”标记。",
+["sgkgodnizhanfrom"]="伤害来源获得“袭”标记",
+["sgkgodnizhanto"]="该角色获得“袭”标记",
+["@sgkgodxi"]="袭",
+["skgodcuifeng"]="摧锋",
+[":skgodcuifeng"]="<font color=\"blue\"><b>锁定技，</b></font>结束阶段开始时，若所有角色的“袭”标记总数不小于4，你须从有“袭”标记的角色处各获得等同于其“袭”标记数的手牌（若不足则获得其全部手牌并对其造成1点伤害），然后弃置所有角色全部的“袭”标记。",
+["skgodweizhen"]="威震",
+[":skgodweizhen"]="准备阶段开始时，你可以弃置所有角色全部的“袭”标记，然后摸等量的牌。",
+["$sgkgodnizhan"]="已是成败二分之时！",
+["$skgodcuifeng"]="全军化为一体,总攻！",
+["$skgodweizhen"]="让你见识我军的真正实力！",
+["~sgkgodzhangliao"]="不求留名青史,但求无愧于心……",
+["designer:sgkgodzhangliao"]="網路神人",
+["illustrator:sgkgodzhangliao"]="網路神人",
+["cv:sgkgodzhangliao"]="網路神人",
+
+["skgodluxun"]="神陆逊",
+["#skgodluxun"]="焚業滅陣",
+["skgodjieyan"]="劫焰",
+[":skgodjieyan"]="每当一张红色的「殺」或非延時錦囊牌僅指定一名角色時，你可以弃置一张牌令其無效，然后你對目標角色造成一點火焰傷害。",
+["@skgodjieyan"]="你可以弃置一张牌令其無效，然后對目標角色造成一點火焰傷害。",
+["skgodfenying"]="焚营",
+[":skgodfenying"]="每当你对一名角色造成伤害后，若你的手牌数不大于你的体力上限，你可以弃置一张红色牌，对其或与其距离最近的另一名角色造成等量的火焰伤害。",
+["@skgodfenying"]="你可以弃置一张红色牌发动“焚营”",
+["$skgodjieyan"]="炙浊之气，已溢满万剑。",
+["$skgodfenying"]="随着大火,往生去吧！",
+["~skgodluxun"]="火,终究是无情之物！",
+["designer:skgodluxun"]="網路神人",
+["illustrator:skgodluxun"]="網路神人",
+["cv:skgodluxun"]="網路神人",
+["@skgodshendao-retrial"] = "你可以用場上的一張牌進行改判",
+["sgkgoddianjie-chain"] = "請選擇要橫置的角色",
+["sgkgodfenying-invoke"] = "對一名角色造成一點火焰傷害",
+}
